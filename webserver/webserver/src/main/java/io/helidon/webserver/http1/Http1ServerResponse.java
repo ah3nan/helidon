@@ -64,6 +64,10 @@ class Http1ServerResponse extends ServerResponseBase<Http1ServerResponse> implem
 
     private static final WritableHeaders<?> EMPTY_HEADERS = WritableHeaders.create();
 
+    // Copying is cheaper than the composite-buffer wrapper for smaller payloads;
+    // 1 KiB matches Netty's AdaptiveCumulator merge/compose threshold.
+    private static final int MIN_COMPOSITE_BODY_SIZE = 1024;
+
     private final ConnectionContext ctx;
     private final Http1ConnectionListener sendListener;
     private final DataWriter dataWriter;
@@ -477,12 +481,27 @@ class Http1ServerResponse extends ServerResponseBase<Http1ServerResponse> implem
         sendListener.status(ctx, usedStatus);
         sendListener.headers(ctx, headers);
 
+        // Direct writers consume the buffer before returning, so the entity can be
+        // wrapped instead of copied. Queued/async writers may retain it, so keep the
+        // defensive copy for them.
+        boolean compositeBody = ctx.listenerContext().config().writeQueueLength() <= 1
+                && length >= MIN_COMPOSITE_BODY_SIZE
+                && !headRequest
+                && !noEntityResponse
+                && !forcedChunkedEncoding;
+
         // give some space for code and headers + entity
-        BufferData responseBuffer = BufferData.growing(256 + (headRequest || noEntityResponse ? 0 : length));
+        int bufferSize = compositeBody
+                ? 256
+                : 256 + (headRequest || noEntityResponse ? 0 : length);
+        BufferData responseBuffer = BufferData.growing(bufferSize);
 
         keepConnectionOpen = resolveKeepConnectionOpen();
         nonEntityBytes(headers, usedStatus, responseBuffer, keepAlive, validateHeaders);
-        if (!headRequest && !noEntityResponse && forcedChunkedEncoding) {
+        if (compositeBody) {
+            responseBuffer = BufferData.create(responseBuffer,
+                                               BufferData.create(bytes, position, length));
+        } else if (!headRequest && !noEntityResponse && forcedChunkedEncoding) {
             byte[] hex = Integer.toHexString(length).getBytes(StandardCharsets.US_ASCII);
             responseBuffer.write(hex);
             responseBuffer.write('\r');
