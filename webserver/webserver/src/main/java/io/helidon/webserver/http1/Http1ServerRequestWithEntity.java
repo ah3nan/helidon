@@ -46,6 +46,7 @@ final class Http1ServerRequestWithEntity extends Http1ServerRequest {
     private final boolean expectContinue;
     private final boolean continueImmediately;
     private boolean continueSent;
+    private boolean streamFilterSet;
     private UnaryOperator<InputStream> streamFilter = UnaryOperator.identity();
 
     Http1ServerRequestWithEntity(ConnectionContext ctx,
@@ -79,7 +80,10 @@ final class Http1ServerRequestWithEntity extends Http1ServerRequest {
                                                                         headers,
                                                                         listenerCtx.mediaContext(),
                                                                         listenerCtx.config().maxPayloadSize(),
-                                                                        http1Config.maxBufferedEntitySize().toBytes()));
+                                                                        http1Config.maxBufferedEntitySize().toBytes(),
+                                                                        decoder == ContentDecoder.NO_OP && !streamFilterSet
+                                                                                ? headers.contentLength().orElse(-1)
+                                                                                : -1));
     }
 
     @Override
@@ -102,6 +106,7 @@ final class Http1ServerRequestWithEntity extends Http1ServerRequest {
     @Override
     public void streamFilter(UnaryOperator<InputStream> filterFunction) {
         Objects.requireNonNull(filterFunction);
+        streamFilterSet = true;
         UnaryOperator<InputStream> current = this.streamFilter;
         this.streamFilter = it -> filterFunction.apply(current.apply(it));
     }

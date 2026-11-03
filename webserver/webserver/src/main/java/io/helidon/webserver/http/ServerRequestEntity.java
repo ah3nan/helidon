@@ -39,6 +39,7 @@ public final class ServerRequestEntity extends ReadableEntityBase implements Rea
     private final ServerRequestHeaders requestHeaders;
     private final MediaContext mediaContext;
     private final long maxPayloadSize;
+    private final long exactContentLength;
 
     @SuppressWarnings("checkstyle:ParameterNumber")
     private ServerRequestEntity(Consumer<Boolean> entityRequestedCallback,
@@ -49,13 +50,15 @@ public final class ServerRequestEntity extends ReadableEntityBase implements Rea
                                 ServerRequestHeaders requestHeaders,
                                 MediaContext mediaContext,
                                 long maxPayloadSize,
-                                long maxBufferedEntitySize) {
+                                long maxBufferedEntitySize,
+                                long exactContentLength) {
         super(entityRequestedCallback, readEntityFunction, entityProcessedRunnable, maxBufferedEntitySize);
         this.streamFilter = streamFilter;
         this.decoder = decoder;
         this.requestHeaders = requestHeaders;
         this.mediaContext = mediaContext;
         this.maxPayloadSize = maxPayloadSize;
+        this.exactContentLength = exactContentLength;
     }
 
     /**
@@ -92,7 +95,8 @@ public final class ServerRequestEntity extends ReadableEntityBase implements Rea
                       requestHeaders,
                       mediaContext,
                       -1,
-                      maxBufferedEntitySize);
+                      maxBufferedEntitySize,
+                      -1);
     }
 
     /**
@@ -121,6 +125,30 @@ public final class ServerRequestEntity extends ReadableEntityBase implements Rea
                                              MediaContext mediaContext,
                                              long maxPayloadSize,
                                              long maxBufferedEntitySize) {
+        return create(entityRequestedCallback,
+                      streamFilter,
+                      decoder,
+                      readEntityFunction,
+                      entityProcessedRunnable,
+                      requestHeaders,
+                      mediaContext,
+                      maxPayloadSize,
+                      maxBufferedEntitySize,
+                      -1);
+    }
+
+    @Api.Internal
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public static ServerRequestEntity create(Consumer<Boolean> entityRequestedCallback,
+                                             UnaryOperator<InputStream> streamFilter,
+                                             ContentDecoder decoder,
+                                             Function<Integer, BufferData> readEntityFunction,
+                                             Runnable entityProcessedRunnable,
+                                             ServerRequestHeaders requestHeaders,
+                                             MediaContext mediaContext,
+                                             long maxPayloadSize,
+                                             long maxBufferedEntitySize,
+                                             long exactContentLength) {
         return new ServerRequestEntity(entityRequestedCallback,
                                        streamFilter,
                                        decoder,
@@ -129,7 +157,8 @@ public final class ServerRequestEntity extends ReadableEntityBase implements Rea
                                        requestHeaders,
                                        mediaContext,
                                        maxPayloadSize,
-                                       maxBufferedEntitySize);
+                                       maxBufferedEntitySize,
+                                       exactContentLength);
     }
 
     @Override
@@ -142,7 +171,16 @@ public final class ServerRequestEntity extends ReadableEntityBase implements Rea
                                        requestHeaders,
                                        mediaContext,
                                        maxPayloadSize,
-                                       maxBufferedEntitySize());
+                                       maxBufferedEntitySize(),
+                                       exactContentLength);
+    }
+
+    @Override
+    protected byte[] readAllBytes() {
+        if (exactContentLength >= 0) {
+            return readAllBytes(exactContentLength);
+        }
+        return super.readAllBytes();
     }
 
     @Override

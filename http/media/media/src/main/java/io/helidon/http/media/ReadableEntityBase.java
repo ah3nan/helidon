@@ -18,6 +18,7 @@ package io.helidon.http.media;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -220,6 +221,41 @@ public abstract class ReadableEntityBase implements ReadableEntity {
                 inputStream.skipReadOnClose = true;
             }
             return stream.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Read all bytes of the entity into an exactly sized array when the transport
+     * length is known. Callers must only use this when no decoder or stream filter
+     * can change the length.
+     *
+     * @param contentLength expected number of bytes
+     * @return all bytes of the entity
+     */
+    protected byte[] readAllBytes(long contentLength) {
+        if (contentLength < 0 || contentLength > Integer.MAX_VALUE) {
+            return readAllBytes();
+        }
+        try (InputStream stream = inputStream()) {
+            if (inputStream != null) {
+                inputStream.skipReadOnClose = true;
+            }
+            if (contentLength == 0) {
+                return BufferData.EMPTY_BYTES;
+            }
+            byte[] bytes = new byte[(int) contentLength];
+            int offset = 0;
+            while (offset < bytes.length) {
+                int read = stream.read(bytes, offset, bytes.length - offset);
+                if (read < 0) {
+                    throw new UncheckedIOException(new EOFException(
+                            "Entity ended before the declared Content-Length was read"));
+                }
+                offset += read;
+            }
+            return bytes;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -76,6 +76,7 @@ class Http2ServerRequest implements RoutingRequest {
     private Context context;
     // preparation for continue support in HTTP/2
     private boolean continueSent;
+    private boolean streamFilterSet;
     private UnaryOperator<InputStream> streamFilter = UnaryOperator.identity();
     private String matchingPattern;
     private Supplier<Optional<String>> matchingPatternSupplier;
@@ -109,7 +110,10 @@ class Http2ServerRequest implements RoutingRequest {
                                                                                  this.headers,
                                                                                  ctx.listenerContext().mediaContext(),
                                                                                  maxPayloadSize,
-                                                                                 maxBufferedEntitySize));
+                                                                                 maxBufferedEntitySize,
+                                                                                 decoder == ContentDecoder.NO_OP && !streamFilterSet
+                                                                                         ? this.headers.contentLength().orElse(-1)
+                                                                                         : -1));
         } else {
             this.entity = LazyValue.create(ReadableEntityBase.empty());
         }
@@ -296,6 +300,7 @@ class Http2ServerRequest implements RoutingRequest {
     @Override
     public void streamFilter(UnaryOperator<InputStream> filterFunction) {
         Objects.requireNonNull(filterFunction);
+        streamFilterSet = true;
         UnaryOperator<InputStream> current = this.streamFilter;
         this.streamFilter = it -> filterFunction.apply(current.apply(it));
     }
