@@ -155,17 +155,16 @@ class FixedBufferData implements BufferData {
 
     @Override
     public void write(BufferData toWrite) {
-        byte[] buffer = new byte[length - writePosition];
-        int read = toWrite.read(buffer);
-        System.arraycopy(buffer, 0, this.bytes, writePosition, read);
+        int remaining = length - writePosition;
+        int read = toWrite.read(this.bytes, writePosition, remaining);
         writePosition += read;
     }
 
     @Override
     public void write(BufferData toWrite, int length) {
-        byte[] buffer = new byte[length];
-        int read = toWrite.read(buffer);
-        System.arraycopy(buffer, 0, this.bytes, writePosition, read);
+        // Never write past the logical length of this fixed buffer.
+        int toRead = Math.min(length, this.length - writePosition);
+        int read = toWrite.read(this.bytes, writePosition, toRead);
         writePosition += read;
     }
 

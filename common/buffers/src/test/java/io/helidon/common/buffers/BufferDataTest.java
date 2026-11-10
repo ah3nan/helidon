@@ -122,6 +122,41 @@ class BufferDataTest {
     }
 
     @Test
+    void fixedBufferWriteCopiesSourceWithoutTemporaryArray() {
+        BufferData target = BufferData.create(8);
+        BufferData source = BufferData.create(new byte[] {1, 2, 3, 4});
+
+        target.write(source);
+
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, target.readBytes());
+        assertThat(source.available(), is(0));
+    }
+
+    @Test
+    void fixedBufferLimitedWriteLeavesRemainderInSource() {
+        BufferData target = BufferData.create(8);
+        BufferData source = BufferData.growing(8);
+        source.write(new byte[] {1, 2, 3, 4, 5, 6});
+
+        target.write(source, 4);
+
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, target.readBytes());
+        assertThat(source.available(), is(2));
+    }
+
+    @Test
+    void fixedBufferLimitedWriteHandlesCompositeSource() {
+        BufferData target = BufferData.create(8);
+        BufferData source = BufferData.create(BufferData.create(new byte[] {1, 2}),
+                                               BufferData.create(new byte[] {3, 4}));
+
+        target.write(source, 3);
+
+        assertArrayEquals(new byte[] {1, 2, 3}, target.readBytes());
+        assertThat(source.available(), is(1));
+    }
+
+    @Test
     void growingBufferRetainsLimitedBufferDataWriteWhenCapacityIncreases() {
         byte[] firstBytes = new byte[100];
         byte[] secondBytes = new byte[150];
