@@ -165,6 +165,13 @@ class FixedBufferData implements BufferData {
         // Never write past the logical length of this fixed buffer.
         int toRead = Math.min(length, this.length - writePosition);
         int read = toWrite.read(this.bytes, writePosition, toRead);
+        if (toRead < length && read == toRead && toWrite.available() > 0) {
+            // Preserve the fail-fast behavior of the previous implementation: the caller
+            // requested more than fits, and the source still has data that would have
+            // overflowed the destination array.
+            throw new ArrayIndexOutOfBoundsException(
+                    "Requested " + length + " bytes, but only " + (this.length - writePosition) + " fit");
+        }
         writePosition += read;
     }
 

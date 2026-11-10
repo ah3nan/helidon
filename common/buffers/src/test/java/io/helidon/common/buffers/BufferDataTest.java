@@ -157,6 +157,25 @@ class BufferDataTest {
     }
 
     @Test
+    void fixedBufferLimitedWriteFailsFastWhenSourceExceedsCapacity() {
+        BufferData target = BufferData.create(4);
+        BufferData source = BufferData.create(new byte[] {1, 2, 3, 4, 5, 6});
+
+        assertThrows(ArrayIndexOutOfBoundsException.class, () -> target.write(source, 6));
+    }
+
+    @Test
+    void fixedBufferLimitedWriteAllowsOversizedLengthWhenSourceFits() {
+        BufferData target = BufferData.create(4);
+        BufferData source = BufferData.create(new byte[] {1, 2, 3, 4});
+
+        target.write(source, 8);
+
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, target.readBytes());
+        assertThat(source.available(), is(0));
+    }
+
+    @Test
     void growingBufferRetainsLimitedBufferDataWriteWhenCapacityIncreases() {
         byte[] firstBytes = new byte[100];
         byte[] secondBytes = new byte[150];
