@@ -187,7 +187,7 @@ class BufferDataTest {
     }
 
     @Test
-    void fixedBufferWriteIgnoresNegativeSourceRead() {
+    void fixedBufferWriteRejectsNegativeSourceRead() {
         BufferData target = BufferData.create(8);
         BufferData source = (BufferData) Proxy.newProxyInstance(BufferData.class.getClassLoader(),
                                                                  new Class<?>[] {BufferData.class},
@@ -197,8 +197,22 @@ class BufferDataTest {
                                                                      default -> throw new IllegalStateException(method.toString());
                                                                  });
 
-        target.write(source);
+        assertThrows(ArrayIndexOutOfBoundsException.class, () -> target.write(source));
+        assertThat(target.available(), is(0));
+    }
 
+    @Test
+    void fixedBufferWriteRejectsSourceOverRead() {
+        BufferData target = BufferData.create(8);
+        BufferData source = (BufferData) Proxy.newProxyInstance(BufferData.class.getClassLoader(),
+                                                                 new Class<?>[] {BufferData.class},
+                                                                 (_, method, _) -> switch (method.getName()) {
+                                                                     case "available" -> 9;
+                                                                     case "read" -> 9;
+                                                                     default -> throw new IllegalStateException(method.toString());
+                                                                 });
+
+        assertThrows(ArrayIndexOutOfBoundsException.class, () -> target.write(source));
         assertThat(target.available(), is(0));
     }
 

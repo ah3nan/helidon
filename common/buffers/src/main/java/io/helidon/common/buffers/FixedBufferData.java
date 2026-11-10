@@ -155,10 +155,10 @@ class FixedBufferData implements BufferData {
 
     @Override
     public void write(BufferData toWrite) {
-        int read = toWrite.read(this.bytes, writePosition, length - writePosition);
-        if (read > 0) {
-            writePosition += read;
-        }
+        int toRead = length - writePosition;
+        int read = toWrite.read(this.bytes, writePosition, toRead);
+        checkRead(read, toRead);
+        writePosition += read;
     }
 
     @Override
@@ -169,6 +169,7 @@ class FixedBufferData implements BufferData {
         int capacity = this.length - writePosition;
         int toRead = Math.min(length, capacity);
         int read = toWrite.read(this.bytes, writePosition, toRead);
+        checkRead(read, toRead);
         if (toRead < length && read == toRead && toWrite.available() > 0) {
             // Preserve the fail-fast behavior of the previous implementation: the caller
             // requested more than fits, and the source still has data that would have
@@ -176,8 +177,13 @@ class FixedBufferData implements BufferData {
             throw new ArrayIndexOutOfBoundsException(
                     "Requested " + length + " bytes, but only " + capacity + " fit");
         }
-        if (read > 0) {
-            writePosition += read;
+        writePosition += read;
+    }
+
+    private static void checkRead(int read, int requested) {
+        if (read < 0 || read > requested) {
+            throw new ArrayIndexOutOfBoundsException(
+                    "Source returned " + read + " bytes for a request of " + requested);
         }
     }
 
