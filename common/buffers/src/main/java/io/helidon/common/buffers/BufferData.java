@@ -535,6 +535,13 @@ public interface BufferData {
 
     /**
      * Write the provided buffer to this buffer.
+     * <p>
+     * The source must not share a backing array with this buffer. If the two
+     * buffers overlap, the result is undefined.
+     * <p>
+     * If this method throws, the state of both buffers is undefined and neither
+     * buffer should be reused.
+     *
      * @param toWrite buffer to write
      */
     default void write(BufferData toWrite) {
@@ -543,8 +550,15 @@ public interface BufferData {
 
     /**
      * Write n bytes from the provided buffer to this buffer.
+     * <p>
+     * The source must not share a backing array with this buffer. If the two
+     * buffers overlap, the result is undefined.
+     * <p>
+     * If this method throws, the state of both buffers is undefined and neither
+     * buffer should be reused.
+     *
      * @param toWrite buffer to write
-     * @param length number of bytes to write
+     * @param length  number of bytes to write
      */
     void write(BufferData toWrite, int length);
 

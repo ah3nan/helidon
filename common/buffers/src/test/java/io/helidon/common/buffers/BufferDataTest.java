@@ -162,6 +162,7 @@ class BufferDataTest {
         BufferData source = BufferData.create(new byte[] {1, 2, 3, 4, 5, 6});
 
         assertThrows(ArrayIndexOutOfBoundsException.class, () -> target.write(source, 6));
+        assertThat(target.available(), is(0));
     }
 
     @Test
@@ -173,6 +174,62 @@ class BufferDataTest {
 
         assertArrayEquals(new byte[] {1, 2, 3, 4}, target.readBytes());
         assertThat(source.available(), is(0));
+    }
+
+    @Test
+    void fixedBufferWriteLeavesPositionUnchangedForEmptySource() {
+        BufferData target = BufferData.create(8);
+        BufferData source = BufferData.create(new byte[0]);
+
+        target.write(source);
+
+        assertThat(target.available(), is(0));
+    }
+
+    @Test
+    void fixedBufferWriteIgnoresNegativeSourceRead() {
+        BufferData target = BufferData.create(8);
+        BufferData source = (BufferData) Proxy.newProxyInstance(BufferData.class.getClassLoader(),
+                                                                 new Class<?>[] {BufferData.class},
+                                                                 (_, method, _) -> switch (method.getName()) {
+                                                                     case "available" -> 1;
+                                                                     case "read" -> -1;
+                                                                     default -> throw new IllegalStateException(method.toString());
+                                                                 });
+
+        target.write(source);
+
+        assertThat(target.available(), is(0));
+    }
+
+    @Test
+    void fixedBufferLimitedWriteRejectsNegativeLength() {
+        BufferData target = BufferData.create(8);
+        BufferData source = BufferData.create(new byte[] {1});
+
+        assertThrows(IllegalArgumentException.class, () -> target.write(source, -1));
+    }
+
+    @Test
+    void fixedBufferLimitedWriteAcceptsLengthEqualToRemainingCapacity() {
+        BufferData target = BufferData.create(4);
+        BufferData source = BufferData.create(new byte[] {1, 2, 3, 4});
+
+        target.write(source, 4);
+
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, target.readBytes());
+        assertThat(source.available(), is(0));
+    }
+
+    @Test
+    void fixedBufferLimitedWriteFailsWhenTargetIsFull() {
+        BufferData target = BufferData.create(4);
+        target.write(new byte[] {1, 2, 3, 4});
+        int availableBefore = target.available();
+        BufferData source = BufferData.create(new byte[] {5});
+
+        assertThrows(ArrayIndexOutOfBoundsException.class, () -> target.write(source, 1));
+        assertThat(target.available(), is(availableBefore));
     }
 
     @Test
